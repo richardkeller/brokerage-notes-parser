@@ -20,7 +20,7 @@ function calculate(transactions) {
                 if (data[transaction.name].quantity == 0) {
                     delete data[transaction.name];
                 } else if (data[transaction.name].quantity < 0) {
-                    throw 'Aconteceu uma venda maior que o número de ações, por favor verifique se você cadastrou as bonificações/subscrições corretamente';
+                    // throw 'Aconteceu uma venda maior que o número de ações, por favor verifique se você cadastrou as bonificações/subscrições corretamente';
                 }
             }
         } else {
@@ -30,7 +30,7 @@ function calculate(transactions) {
                     value: utils.toFixed(transaction.value + (transaction.tax / transaction.quantity))
                 };
             } else {
-                throw 'Aconteceu uma venda sem o cadastro da ação, por favor verifique se está ordenado corretamente';
+                //throw 'Aconteceu uma venda sem o cadastro da ação, por favor verifique se está ordenado corretamente';
             }
         }
     }

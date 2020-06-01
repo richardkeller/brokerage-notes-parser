@@ -19,23 +19,34 @@ function getPDFFiles() {
     for (const fileName of fileNames) {
         const filePath = path.join(INPUT_PATH, fileName);
         const file = fs.readFileSync(filePath);
-        files.push(file);
+        const type = fileName.toLowerCase().includes('notacorretagem') ? 'note' : 'statement';
+        files.push({ type: type, file: file });
     }
     return files;
 };
 
 async function extractPages(pdfFiles) {
-    const pages = [];
+    const pages = {
+        statements : [],
+        notes: [],
+    };
     for (const pdf of pdfFiles) {
-        const data = await PDF2JSON(pdf);
-        pages.push(...data.pages);
+        const data = await PDF2JSON(pdf.file);
+        if (pdf.type == 'note') {
+            pages.notes.push(...data.pages)
+        } else {
+            pages.statements.push(...data.pages)
+        }
     }
     return pages;
 };
 
 function extractData(pages) {
-    const data = [];
-    for (const page of pages) {
+    const data = {
+        transactions: [],
+        statementLines: [],
+    };
+    for (const page of pages.notes) {
         const date = getDate(page);
         const cost = getCost(page);
         const taxes = getTaxes(page);
@@ -47,10 +58,72 @@ function extractData(pages) {
             pageTexts.push(clearText);
         }
 
-        data.push(...extractTransactions(pageTexts, date, cost, taxes));
+        data.transactions.push(...extractTransactions(pageTexts, date, cost, taxes));
+    }
+    for (const page of pages.statements) {
+      const isFirstPage = page.texts[0] && page.texts[0].text === 'Extrato';
+      let i = 0;
+      if (isFirstPage) {
+        i = page.texts.findIndex(t => t.text === 'Valor') + 2;
+      }
+      
+      while (i < page.texts.length) {
+        if (page.texts.length >= i+4) {
+            const liqDate = page.texts[i].text;
+            const movDate = page.texts[++i].text;
+          if (isValidDate(liqDate) && isValidDate(movDate)) {
+            let fullDescription = page.texts[++i].text;
+            while (!page.texts[++i].text.includes('R$')){
+              fullDescription += ' '+ page.texts[i].text;
+            }
+            const amount = utils.toFloat(page.texts[i].text.replace('R$', ''));
+            const balance = utils.toFloat(page.texts[++i].text.replace('R$', ''));
+            const subscriptionDescriptions = ['COMPRA DE OFERTA DE AÇÕES','SUBSCRIÇÃO'];
+            let quantity;
+            // TODO: there is no way to know RECEBIMENTO DE SUBSCRIÇÃO DE SOBRAS ticker
+            if (subscriptionDescriptions.find((d) => fullDescription.includes(d)) &&
+              !fullDescription.includes('RECEBIMENTO DE SUBSCRIÇÃO DE SOBRAS')) {
+              let description;
+              let sub = fullDescription.match(/SUBSCRIÇÃO BR([a-zA-Z]{4}).*S\/ (\d+)/);
+              if (sub && sub.length == 3) {
+                description = sub[1];
+                quantity = parseInt(sub[2]);
+              } else {
+                sub = fullDescription.match(/COMPRA DE OFERTA DE AÇÕES BR([a-zA-Z]{4}).* (\d+)/);
+                if(sub && sub.length == 3) {
+                  description = sub[1];
+                  quantity = parseInt(sub[2]);
+                } else {
+                  throw new Error('Could not parse subscription transactions');
+                }
+              }
+              data.transactions.push({ name: description + '('+ fullDescription + ')', date: liqDate, type: config.SUBSCRIPTION_STRING, quantity, value: -1 * (amount/quantity),  tax: 0 });
+            } else {
+              data.statementLines.push({ name: fullDescription, date: liqDate, type: '?', quantity: '?', value: amount, tax: 0 });
+            }
+            i++;
+          } else {
+              break;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+
+    for (const transaction of data.transactions) {
+      if ([config.BUY_STRING,config.SUBSCRIPTION_STRING].includes(transaction.type)) {
+        transaction.irpf_text = `${transaction.name} comprados em ${transaction.date} por R$ ${transaction.value} cada`
+      } else {
+        transaction.irpf_text = `${transaction.name} vendidos em ${transaction.date} por R$ ${transaction.value} cada`
+      }
     }
     return data;
 };
+
+function isValidDate(text) {
+    return text.match(/\d\d\/\d\d\/\d\d\d\d/);
+}
 
 function getDate(page) {
     const PIVOT_TEXT = 'Data pregão';
@@ -169,8 +242,12 @@ async function load() {
     const files = getPDFFiles();
     const pages = await extractPages(files);
     const data = extractData(pages);
-    data.push(...extras);
-    return { transactions: utils.sortByDate(data), unknowns };
+    data.transactions.push(...extras);
+    return { 
+      transactions: utils.sortByDate(data.transactions),
+      statementLines: utils.sortByDate(data.statementLines),
+      unknowns
+    };
 };
 
 

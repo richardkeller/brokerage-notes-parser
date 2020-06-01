@@ -1,11 +1,25 @@
-const OUTPUT_FILE = 'output.json';
+const JSON_OUTPUT_FILE = 'output.json';
+const CSV_OUTPUT_FILE = 'transactions.csv';
+const CSV_ADDITIONAL_OUTPUT_FILE = 'additional.csv';
 
 const fs = require('fs');
 const moment = require('moment');
+const jsonexport = require('jsonexport');
 
 function exportJSON(json) {
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(json));
+    fs.writeFileSync(JSON_OUTPUT_FILE, JSON.stringify(json));
 };
+
+async function exportCSV(json) {
+    try {
+        let csv = await jsonexport(json.transactions, { rowDelimiter: '|' });
+        fs.writeFileSync(CSV_OUTPUT_FILE, csv);
+        csv = await jsonexport(json.statementLines, { rowDelimiter: '|' });
+        fs.writeFileSync(CSV_ADDITIONAL_OUTPUT_FILE, csv);
+    } catch (err) {
+        console.error(err);
+    }
+}
 
 function sortByDate(arr) {
     return arr.sort((a, b) => {
@@ -29,6 +43,7 @@ function trimText(str) {
 
 module.exports = {
     exportJSON,
+    exportCSV,
     sortByDate,
     toFixed,
     toFloat,
