@@ -38,18 +38,43 @@ async function extractPages(pdfFiles) {
             pages.statements.push(...data.pages)
         }
     }
+    pages.notes = pages.notes.sort((a,b)=> a.pageId - b.pageId);
     return pages;
 };
 
+function getPageSummary(page) {
+    return {
+        date : getDate(page),
+        cost: getCost(page),
+        taxes: getTaxes(page)
+    }
+}
+// If you have executed more than 18 operations in the same day, the summary will be on the next page
+function isPartialPage(page){
+    return page.texts.some(t => t.text === 'CONTINUA...');
+}
 function extractData(pages) {
     const data = {
         transactions: [],
         statementLines: [],
     };
-    for (const page of pages.notes) {
-        const date = getDate(page);
-        const cost = getCost(page);
-        const taxes = getTaxes(page);
+    for (let i = 0; i < pages.notes.length; i++) {
+        const page = pages.notes[i];
+        const partialPage = isPartialPage(page);
+        let date, cost, taxes;
+        if (partialPage && pages.notes[i+1] != null) {
+            for (let j = i+1; j< pages.notes.length; j++) {
+                if (!isPartialPage(pages.notes[j])){
+                    ({date, cost, taxes} = getPageSummary(pages.notes[j]));
+                    break;
+                }
+            }
+            if (date == null) {
+                throw new Error('Could not find page summary');
+            }
+        } else {
+            ({date, cost, taxes} = getPageSummary(page));
+        }
 
         const pageTexts = [];
 
