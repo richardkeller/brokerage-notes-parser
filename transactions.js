@@ -32,13 +32,14 @@ async function extractPages(pdfFiles) {
     };
     for (const pdf of pdfFiles) {
         const data = await PDF2JSON(pdf.file);
+        data.pages = data.pages.sort((a,b)=> a.pageId - b.pageId);
         if (pdf.type == 'note') {
             pages.notes.push(...data.pages)
         } else {
             pages.statements.push(...data.pages)
         }
     }
-    pages.notes = pages.notes.sort((a,b)=> a.pageId - b.pageId);
+    
     return pages;
 };
 
