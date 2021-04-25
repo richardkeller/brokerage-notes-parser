@@ -10,4 +10,5 @@ Parser for brokerage notes from Clear and Rico (XP Group) brokerages
 
 4- Execute `npm start` to run.
 
-*The output file should be at application's root directory under the name of 'output.json', 'transactions.csv' and 'additional.csv'*
+*The output files should be at application's root directory under the name of 'output.json', 'transactions.csv', 'btc.csv' and 'additional.csv'*
+

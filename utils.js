@@ -1,5 +1,6 @@
 const JSON_OUTPUT_FILE = 'output.json';
 const CSV_OUTPUT_FILE = 'transactions.csv';
+const CSV_LENDED_STOCKS_PROFILE_OUTPUT_FILE = 'btc.csv';
 const CSV_ADDITIONAL_OUTPUT_FILE = 'additional.csv';
 
 const fs = require('fs');
@@ -14,6 +15,8 @@ async function exportCSV(json) {
     try {
         let csv = await jsonexport(json.transactions, { rowDelimiter: '|' });
         fs.writeFileSync(CSV_OUTPUT_FILE, csv);
+        csv = await jsonexport(json.lendedStocksProfit, { rowDelimiter: '|' });
+        fs.writeFileSync(CSV_LENDED_STOCKS_PROFILE_OUTPUT_FILE, csv);
         csv = await jsonexport(json.statementLines, { rowDelimiter: '|' });
         fs.writeFileSync(CSV_ADDITIONAL_OUTPUT_FILE, csv);
     } catch (err) {

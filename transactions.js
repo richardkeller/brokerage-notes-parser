@@ -58,6 +58,7 @@ function extractData(pages) {
     const data = {
         transactions: [],
         statementLines: [],
+        lendedStocksProfit: [],
     };
     for (let i = 0; i < pages.notes.length; i++) {
         const page = pages.notes[i];
@@ -124,6 +125,20 @@ function extractData(pages) {
                 }
               }
               data.transactions.push({ name: description + '('+ fullDescription + ')', date: liqDate, type: config.SUBSCRIPTION_STRING, quantity, value: -1 * (amount/quantity),  tax: 0 });
+            } else if (fullDescription.includes('RECEBIMENTO DE SUBSCRIÇÃO DE SOBRAS')){
+                let description;
+                let sub = fullDescription.match(/RECEBIMENTO DE SUBSCRIÇÃO DE SOBRAS ([a-zA-Z]{4})/);
+                if (sub && sub.length == 2) {
+                  description = sub[0];
+                  quantity = '?';
+                }
+                data.transactions.push({ name: description + '('+ fullDescription + ')', date: liqDate, type: config.SUBSCRIPTION_STRING, quantity, value: amount + ' Total',  tax: 0 });
+            } else if (fullDescription.includes('Crédito Ref. Taxa de Remuneração BTC')) { 
+              const stockName = fullDescription.replace('Crédito Ref. Taxa de Remuneração BTC ','').trim();
+              data.lendedStocksProfit.push({ name: fullDescription, stock: stockName, value: amount });
+            } else if (fullDescription.includes('DEBITO CBLC IRRF S/ RENDIMENTO DE BTC')) {
+              const stockName = fullDescription.replace('DEBITO CBLC IRRF S/ RENDIMENTO DE BTC ','').trim();
+              data.lendedStocksProfit.push({ name: fullDescription, stock: stockName, value: amount });
             } else {
               data.statementLines.push({ name: fullDescription, date: liqDate, type: '?', quantity: '?', value: amount, tax: 0 });
             }
@@ -269,9 +284,20 @@ async function load() {
     const pages = await extractPages(files);
     const data = extractData(pages);
     data.transactions.push(...extras);
+
+    const lendedStocksProfit = data.lendedStocksProfit.reduce((previous, current)=> {
+        previous[current.stock] = previous[current.stock] || 0;
+        previous[current.stock] = previous[current.stock] + current.value;
+        return previous;
+      },[]);
+    const lendedStocksProfitArray = [];
+    for( const [key, value] of Object.entries(lendedStocksProfit)) {
+        lendedStocksProfitArray.push({name: key, value});
+    }
     return { 
       transactions: utils.sortByDate(data.transactions),
       statementLines: utils.sortByDate(data.statementLines),
+      lendedStocksProfit: lendedStocksProfitArray,
       unknowns
     };
 };
